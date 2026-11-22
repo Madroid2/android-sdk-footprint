@@ -42,7 +42,7 @@ The local runner stages a POM-based publication in a temporary Maven repository.
 
 ## 3. Try the included release job
 
-Open **Actions → SDK footprint → Run workflow**. The default example compares AndroidX ExifInterface 1.3.6 with 1.3.7. It also runs on pull requests, merge queues and pushes to main. Review the two host rows in the job summary and download `sdk-footprint-reports` for the JSON. The example budget is 102,400 bytes (100 KiB) per host. A delta equal to the budget passes. Exit 1 means over budget and exit 2 means the comparison could not complete.
+Open **Actions → SDK footprint → Run workflow**. The default example compares AndroidX ExifInterface 1.3.6 with 1.3.7. Select the **playtime** profile and enter two compatible Playtime versions to run the same check for that SDK. The default example also runs on pull requests, merge queues and pushes to main. Review the two host rows in the job summary and download `sdk-footprint-reports` for the JSON. The example budget is 102,400 bytes (100 KiB) per host. A delta equal to the budget passes. Exit 1 means over budget and exit 2 means the comparison could not complete.
 
 Run the same example locally:
 
@@ -91,7 +91,7 @@ jobs:
           path: ${{ steps.size.outputs.reports }}/*.json
 ```
 
-For **publisher APK impact**, add `:sdk:generatePomFileForReleasePublication` to the build command, use a published baseline version as input and replace the Action's `with` block as shown below. Ensure Platform 36 and Build Tools 35.0.0 are installed. Both versions use the same profile. A local baseline can also be supplied with `baseline-pom`.
+For **publisher APK impact with a POM-only publication**, add `:sdk:generatePomFileForReleasePublication` to the build command, use a published baseline version as input and replace the Action's `with` block as shown below. Ensure Platform 36 and Build Tools 35.0.0 are installed. Both versions use the same profile. A local baseline can also be supplied with `baseline-pom`.
 
 ```yaml
 with:
@@ -102,6 +102,8 @@ with:
   candidate-pom: sdk/build/publications/release/pom-default.xml
   max-growth-bytes: ${{ vars.SDK_FOOTPRINT_BUDGET_BYTES }}
 ```
+
+For a Gradle publication that includes a `.module` sidecar, point the Action at the complete staging repository. For example, configure a Maven publishing repository named `Footprint` at `layout.buildDirectory.dir("footprint-maven")` in your SDK module, then run `./gradlew :sdk:publishReleasePublicationToFootprintRepository` in the producer step. Supply `candidate: '1.3.0-rc01'` (the actual published version) and `candidate-repo: sdk/build/footprint-maven` instead of the AAR and POM inputs. Gradle resolves the measured module from that local repository. Publish additional dependencies to configured dependency repositories when needed.
 
 To enforce the decision, add **SDK footprint budget** as a required check in your target branch's ruleset after its first run. In a release workflow, have the publishing job declare `needs: footprint` and use the normal success condition. This keeps publication behind the size check.
 

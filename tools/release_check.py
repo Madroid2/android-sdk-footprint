@@ -25,15 +25,15 @@ def compare(args):
         growth = {"AAR": after["aar_bytes"] - before["aar_bytes"]}
         detail = {"growth_bytes": growth}
     else:
-        def measure(source, pom):
+        def measure(source, pom, repository):
+            if repository:
+                return fp.benchmark(ROOT, source, False, args.profile, repository.resolve())
             if pom:
                 return fp.benchmark_local(ROOT, Path(source), Path(pom), False, args.profile)
             return fp.benchmark(ROOT, source, False, args.profile)
 
-        before = measure(args.baseline, args.baseline_pom)
-        emit(reports / "baseline.json", before)
-        after = measure(args.candidate, args.candidate_pom)
-        emit(reports / "candidate.json", after)
+        before = measure(args.baseline, args.baseline_pom, args.baseline_repo)
+        after = measure(args.candidate, args.candidate_pom, args.candidate_repo)
         changes = fp.changes(before, after)
         growth = {host: change["apk_bytes"] for host, change in changes.items()}
         detail = {"growth": changes}
@@ -59,13 +59,17 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=("aar", "apk"), required=True)
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--candidate", required=True)
-    parser.add_argument("--baseline-pom")
-    parser.add_argument("--candidate-pom")
+    for side in ("baseline", "candidate"):
+        metadata = parser.add_mutually_exclusive_group()
+        metadata.add_argument(f"--{side}-pom")
+        metadata.add_argument(f"--{side}-repo", type=Path)
     parser.add_argument("--profile", type=Path, default=ROOT / "profiles/exif/profile.json")
     parser.add_argument("--budget", type=fp.nonnegative, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if str(args.profile) in ("playtime", "exif"):
+        args.profile = ROOT / "profiles" / args.profile / "profile.json"
     try:
         sys.exit(compare(args))
     except (OSError, BadZipFile, ValueError, KeyError, TypeError, ET.ParseError, subprocess.CalledProcessError) as error:
-        sys.exit(parser.exit(2, f"Comparison incomplete: {error}\n"))
+        parser.exit(2, f"Comparison incomplete: {error}\n")

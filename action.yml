@@ -16,6 +16,12 @@ inputs:
   candidate-pom:
     description: 'Matching Maven POM when the APK candidate is a local AAR'
     required: false
+  baseline-repo:
+    description: 'Local Gradle/Maven publication repository for the baseline version'
+    required: false
+  candidate-repo:
+    description: 'Local Gradle/Maven publication repository for the candidate version'
+    required: false
   profile:
     description: 'Path to a profile in the caller checkout, defaults to the bundled ExifInterface profile'
     required: false
@@ -37,6 +43,8 @@ runs:
         CANDIDATE: ${{ inputs.candidate }}
         BASELINE_POM: ${{ inputs.baseline-pom }}
         CANDIDATE_POM: ${{ inputs.candidate-pom }}
+        BASELINE_REPO: ${{ inputs.baseline-repo }}
+        CANDIDATE_REPO: ${{ inputs.candidate-repo }}
         PROFILE: ${{ inputs.profile }}
         BUDGET: ${{ inputs.max-growth-bytes }}
       run: |
@@ -46,4 +54,6 @@ runs:
         if [[ -n "$PROFILE" ]]; then args+=(--profile "$PROFILE"); fi
         if [[ -n "$BASELINE_POM" ]]; then args+=(--baseline-pom "$BASELINE_POM"); fi
         if [[ -n "$CANDIDATE_POM" ]]; then args+=(--candidate-pom "$CANDIDATE_POM"); fi
+        if [[ -n "$BASELINE_REPO" ]]; then args+=(--baseline-repo "$BASELINE_REPO"); fi
+        if [[ -n "$CANDIDATE_REPO" ]]; then args+=(--candidate-repo "$CANDIDATE_REPO"); fi
         python3 "$GITHUB_ACTION_PATH/tools/release_check.py" "${args[@]}"

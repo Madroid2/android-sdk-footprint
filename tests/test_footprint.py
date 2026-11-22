@@ -1,6 +1,8 @@
 import copy
 import io
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -68,6 +70,26 @@ class FootprintTest(unittest.TestCase):
             self.assertEqual(fp.main(["aar-pair", str(v1), str(v2)]), 0)
         self.assertEqual(json.loads(out.getvalue())["aar_growth_bytes"],
                          v2.stat().st_size - v1.stat().st_size)
+
+    def test_ci_archive_gate_exit_codes_and_reports(self):
+        a = self.archive(self.root / "v1.aar", {"AndroidManifest.xml": b"manifest"})
+        b = self.archive(self.root / "v2.aar", {"AndroidManifest.xml": b"manifest", "assets/data": b"bits"})
+        delta = b.stat().st_size - a.stat().st_size
+        for budget, status in ((delta, 0), (delta - 1, 1)):
+            reports = self.root / str(budget)
+            result = subprocess.run([sys.executable, "tools/release_check.py", "--mode", "aar",
+                                     "--baseline", str(a), "--candidate", str(b), "--budget", str(budget),
+                                     "--output", str(reports)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, status, result.stderr)
+            evidence = json.loads((reports / "growth.json").read_text())
+            self.assertEqual(evidence["growth_bytes"]["AAR"], delta)
+            self.assertEqual(bool(evidence["over_budget"]), bool(status))
+
+    def test_mixed_sdk_reports_are_rejected(self):
+        before = self.matrix()
+        after = dict(before, sdk_coordinate="example:other")
+        with self.assertRaisesRegex(ValueError, "coordinates differ"):
+            fp.changes(before, after)
 
     def test_invalid_apk_rejected(self):
         path = self.archive(self.root / "base.apk", {"resources.arsc": b"resource-only split"})
