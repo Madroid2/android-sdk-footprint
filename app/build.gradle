@@ -46,6 +46,10 @@ dependencies {
     add('composeImplementation', 'org.jetbrains.kotlin:kotlin-stdlib:2.1.21')
     add('composeImplementation', 'androidx.activity:activity-compose:1.10.1')
     add('composeImplementation', 'androidx.compose.material3:material3')
+    def sdkLibs = new File(gradle.ext.footprintSources.parentFile, 'libs')
+    if (sdkLibs.isDirectory()) {
+        add('integratedImplementation', fileTree(dir: sdkLibs, include: ['*.aar', '*.jar']))
+    }
     add('integratedImplementation', "${gradle.ext.footprintProfile.group}:${gradle.ext.footprintProfile.artifact}:${providers.gradleProperty('sdkVersion').getOrElse('1.3.7')}")
 }
 

@@ -42,7 +42,7 @@ The local runner stages a POM-based publication in a temporary Maven repository.
 
 ## 3. Try the included release job
 
-Open **Actions → SDK footprint → Run workflow**. The default example compares AndroidX ExifInterface 1.3.6 with 1.3.7. Select the **playtime** profile and enter two compatible Playtime versions to run the same check for that SDK. The default example also runs on pull requests, merge queues and pushes to main. Review the two host rows in the job summary and download `sdk-footprint-reports` for the JSON. The example budget is 102,400 bytes (100 KiB) per host. A delta equal to the budget passes. Exit 1 means over budget and exit 2 means the comparison could not complete.
+Open **Actions → SDK footprint → Run workflow**. The default example compares AndroidX ExifInterface 1.3.6 with 1.3.7. For Playtime, select **mode: aar**, **profile: playtime**, baseline **4.5.2** and candidate **4.5.3** to compare the published files. In APK mode, a hosted test of this Playtime baseline stopped in R8 because its dependency graph referenced missing FaceTec classes. This is an incomplete comparison. For a host that integrates FaceTec, supply its authorized runtime dependencies in the fixture and repeat the APK check. [Build log](https://github.com/Madroid2/android-sdk-footprint/actions/runs/45015357623) The default example also runs on pull requests, merge queues and pushes to main. Review the two host rows in the job summary and download `sdk-footprint-reports` for the JSON. The example budget is 102,400 bytes (100 KiB) per host. A delta equal to the budget passes. Exit 1 means over budget and exit 2 means the comparison could not complete.
 
 Run the same example locally:
 
@@ -114,7 +114,7 @@ Archive mode accepts any Android AAR directly. For publisher APK measurements, c
 1. Set `group` and `artifact` in `profile.json` to the Maven module. Optionally add `repository` for an additional Maven URL. Google Maven and Maven Central are configured by default.
 2. Implement `dev.madroid.footprint.SdkEntry.open(Activity)` under the adjacent `java/` directory. Call a representative public API. The integrated release includes this source so the shrinker can see an actual SDK usage path.
 
-Use `--profile path/to/profile.json` locally or the Action's `profile` input in CI. The repository includes profiles for [AndroidX ExifInterface](profiles/exif/) and [Playtime](profiles/playtime/). Private dependency repositories require the build runner to have appropriate access. Additional manifest entries, resources, Gradle plugins or a different minimum Android API may require adapting the host fixtures to match your SDK.
+Use `--profile path/to/profile.json` locally or the Action's `profile` input in CI. The repository includes profiles for [AndroidX ExifInterface](profiles/exif/) and [Playtime](profiles/playtime/). Private dependency repositories require the build runner to have appropriate access. For local host-supplied binary dependencies, place the appropriate standalone AAR/JAR and any required dependencies in a sibling `libs/` directory next to `profile.json`. The integrated host includes those binaries in its measured cost. Private libraries belong in the consuming CI workspace. Additional manifest entries, resources, Gradle plugins or a different minimum Android API may require adapting the host fixtures to match your SDK.
 
 ## Tests
 

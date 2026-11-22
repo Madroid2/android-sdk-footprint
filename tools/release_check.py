@@ -72,4 +72,9 @@ if __name__ == "__main__":
     try:
         sys.exit(compare(args))
     except (OSError, BadZipFile, ValueError, KeyError, TypeError, ET.ParseError, subprocess.CalledProcessError) as error:
+        args.output.mkdir(parents=True, exist_ok=True)
+        emit(args.output / "status.json", {"status": "incomplete", "error": str(error)})
+        if os.environ.get("GITHUB_STEP_SUMMARY"):
+            with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                summary.write("## SDK footprint — incomplete\n\nSee the build log for the failed step.\n")
         parser.exit(2, f"Comparison incomplete: {error}\n")

@@ -12,3 +12,4 @@ reports/
 *.jks
 *.keystore
 .DS_Store
+**/libs/*.jar
