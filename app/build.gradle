@@ -1,0 +1,78 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+android {
+    namespace 'dev.madroid.footprint'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'dev.madroid.footprint'
+        minSdk 23
+        targetSdk 36
+        versionCode 1
+        versionName '1'
+    }
+    buildFeatures { compose true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    flavorDimensions 'host', 'integration'
+    productFlavors {
+        create('lean') { dimension 'host' }
+        create('compose') { dimension 'host' }
+        create('control') { dimension 'integration' }
+        create('integrated') { dimension 'integration' }
+    }
+    sourceSets.integrated.java.srcDir(gradle.ext.footprintSources)
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+}
+
+// Declare the flavor scopes before adding dependencies during project evaluation.
+configurations.maybeCreate('composeImplementation')
+configurations.maybeCreate('integratedImplementation')
+
+dependencies {
+    add('composeImplementation', platform('androidx.compose:compose-bom:2025.06.01'))
+    add('composeImplementation', 'org.jetbrains.kotlin:kotlin-stdlib:2.1.21')
+    add('composeImplementation', 'androidx.activity:activity-compose:1.10.1')
+    add('composeImplementation', 'androidx.compose.material3:material3')
+    add('integratedImplementation', "${gradle.ext.footprintProfile.group}:${gradle.ext.footprintProfile.artifact}:${providers.gradleProperty('sdkVersion').getOrElse('1.3.7')}")
+}
+
+// Export Gradle's selected versions after conflict resolution for each measured host.
+tasks.register('footprintDependencies') {
+    def report = layout.buildDirectory.file('reports/footprint/dependencies.json')
+    inputs.property('requestedSDK', providers.gradleProperty('sdkVersion').orElse('1.3.7'))
+    outputs.file(report)
+    outputs.upToDateWhen { false }
+    doLast {
+        def versions = [:]
+        ['lean', 'compose'].each { host ->
+            ['Control', 'Integrated'].each { integration ->
+                def variant = host + integration + 'Release'
+                def graph = configurations.getByName(variant + 'RuntimeClasspath').incoming.resolutionResult
+                def selected = new TreeMap()
+                graph.allComponents.each { component ->
+                    def id = component.id
+                    if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                        selected["${id.group}:${id.module}".toString()] = id.version
+                    }
+                }
+                versions[variant] = selected
+            }
+        }
+        def file = report.get().asFile
+        file.parentFile.mkdirs()
+        file.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(versions))
+    }
+}

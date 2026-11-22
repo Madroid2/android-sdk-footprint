@@ -1,0 +1,27 @@
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+
+dependencyResolutionManagement {
+    def profilePath = providers.gradleProperty('sdkProfile').getOrElse('profiles/exif/profile.json')
+    def file = new File(profilePath)
+    def profileFile = file.absolute ? file : new File(settingsDir, profilePath)
+    def profile = new groovy.json.JsonSlurper().parse(profileFile)
+    gradle.ext.footprintProfile = profile
+    gradle.ext.footprintSources = new File(profileFile.parentFile, 'java')
+    def stagedRepo = providers.gradleProperty('localSdkRepo').orNull
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        if (profile.repository) {
+            maven { url = uri(profile.repository) }
+        }
+        if (stagedRepo) {
+            exclusiveContent {
+                forRepository { maven { url = uri(stagedRepo) } }
+                filter { includeModule(profile.group, profile.artifact) }
+            }
+        }
+    }
+}
+rootProject.name = 'AndroidSdkFootprint'
+include(':app')

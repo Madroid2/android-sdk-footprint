@@ -1,0 +1,49 @@
+name: Android SDK footprint
+description: Gate an Android SDK release on archive growth or incremental publisher APK growth
+inputs:
+  mode:
+    description: 'aar for two local AAR files, apk for matched publisher builds'
+    required: true
+  baseline:
+    description: 'Published SDK version or local AAR path'
+    required: true
+  candidate:
+    description: 'Published SDK version or local AAR path'
+    required: true
+  baseline-pom:
+    description: 'Matching Maven POM when the APK baseline is a local AAR'
+    required: false
+  candidate-pom:
+    description: 'Matching Maven POM when the APK candidate is a local AAR'
+    required: false
+  profile:
+    description: 'Path to a profile in the caller checkout, defaults to the bundled ExifInterface profile'
+    required: false
+  max-growth-bytes:
+    description: 'Maximum allowed signed increase in bytes, inclusive'
+    required: true
+outputs:
+  reports:
+    description: 'Directory containing JSON evidence from this comparison'
+    value: ${{ steps.check.outputs.reports }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        BASELINE: ${{ inputs.baseline }}
+        CANDIDATE: ${{ inputs.candidate }}
+        BASELINE_POM: ${{ inputs.baseline-pom }}
+        CANDIDATE_POM: ${{ inputs.candidate-pom }}
+        PROFILE: ${{ inputs.profile }}
+        BUDGET: ${{ inputs.max-growth-bytes }}
+      run: |
+        reports=$(mktemp -d "$RUNNER_TEMP/footprint.XXXXXX")
+        echo "reports=$reports" >> "$GITHUB_OUTPUT"
+        args=(--mode "$MODE" --baseline "$BASELINE" --candidate "$CANDIDATE" --budget "$BUDGET" --output "$reports")
+        if [[ -n "$PROFILE" ]]; then args+=(--profile "$PROFILE"); fi
+        if [[ -n "$BASELINE_POM" ]]; then args+=(--baseline-pom "$BASELINE_POM"); fi
+        if [[ -n "$CANDIDATE_POM" ]]; then args+=(--candidate-pom "$CANDIDATE_POM"); fi
+        python3 "$GITHUB_ACTION_PATH/tools/release_check.py" "${args[@]}"
