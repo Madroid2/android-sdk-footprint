@@ -13,8 +13,8 @@ Compare two Android SDK releases before shipping. Measure the change in the AAR 
 From the repository root in Android Studio's Terminal, set the paths to the actual files. Python 3.9+ is sufficient for this step.
 
 ```sh
-V1="$HOME/Downloads/playtime-v1.aar"
-V2="$HOME/Downloads/playtime-v2.aar"
+V1="$HOME/Downloads/YourSdk-v1.aar"
+V2="$HOME/Downloads/YourSdk-v2.aar"
 python3 tools/footprint.py aar-pair "$V1" "$V2"
 ```
 
@@ -24,12 +24,12 @@ Read `aar_growth_bytes`. A positive value means v2 is larger. Identical hashes m
 
 Use JDK 17+, Android SDK Platform 36 and Build Tools 35.0.0. Set `ANDROID_HOME` or configure the SDK location in Android Studio. On macOS you can use the bundled JDK with `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. The first build needs repository access. No device or publisher account is needed.
 
-Supply the matching Maven POM for each file. Choose the profile that exercises the SDK's API. This example uses Playtime 4.x.
+Supply the matching Maven POM for each AAR. Before running the commands below, [create a profile for YourSdk](#5-create-a-profile-for-yoursdk) at `profiles/YourSdk/profile.json`. Use the same profile for both releases.
 
 ```sh
-POM1="$HOME/Downloads/playtime-v1.pom"
-POM2="$HOME/Downloads/playtime-v2.pom"
-PROFILE="profiles/playtime/profile.json"
+POM1="$HOME/Downloads/YourSdk-v1.pom"
+POM2="$HOME/Downloads/YourSdk-v2.pom"
+PROFILE="profiles/YourSdk/profile.json"
 mkdir -p reports
 python3 tools/footprint.py run-local "$V1" "$POM1" --profile "$PROFILE" > reports/v1.json &&
 python3 tools/footprint.py run-local "$V2" "$POM2" --profile "$PROFILE" > reports/v2.json &&
@@ -42,13 +42,15 @@ The local runner stages a POM-based publication in a temporary Maven repository.
 
 ## 3. Try the included release job
 
-Open **Actions → SDK footprint → Run workflow**. The default example compares AndroidX ExifInterface 1.3.6 with 1.3.7. For Playtime, select **mode: aar**, **profile: playtime**, baseline **4.5.2** and candidate **4.5.3** to compare the published files. In APK mode, a hosted test of this Playtime baseline stopped in R8 because its dependency graph referenced missing FaceTec classes. This is an incomplete comparison. For a host that integrates FaceTec, supply its authorized runtime dependencies in the fixture and repeat the APK check. [Build log](https://github.com/Madroid2/android-sdk-footprint/actions/runs/45015357623) The default example also runs on pull requests, merge queues and pushes to main. Review the two host rows in the job summary and download `sdk-footprint-reports` for the JSON. The example budget is 102,400 bytes (100 KiB) per host. A delta equal to the budget passes. Exit 1 means over budget and exit 2 means the comparison could not complete.
+Open **Actions → SDK footprint → Run workflow**. Keep the defaults to measure the bundled fixture, or select `aar` mode to compare its published archives. The default APK comparison also runs on pull requests, merge queues and pushes to main.
 
-Run the same example locally:
+Review the job summary and download `sdk-footprint-reports` for the JSON. In APK mode, the summary has one row per host. The example budget is 102,400 bytes (100 KiB) per host. Growth up to and including the budget passes. Exit 1 means growth exceeded the budget. Exit 2 means the comparison could not complete. If R8 reports missing runtime classes, supply the dependencies your host app provides and rerun the comparison.
+
+To reproduce the default workflow locally, run
 
 ```sh
 python3 tools/release_check.py --mode apk --baseline 1.3.6 --candidate 1.3.7 \
-  --budget 102400 --output reports/exif
+  --budget 102400 --output reports/demo
 ```
 
 ## 4. Gate an unpublished candidate in your own SDK repository
@@ -107,14 +109,21 @@ For a Gradle publication that includes a `.module` sidecar, point the Action at 
 
 To enforce the decision, add **SDK footprint budget** as a required check in your target branch's ruleset after its first run. In a release workflow, have the publishing job declare `needs: footprint` and use the normal success condition. This keeps publication behind the size check.
 
-## 5. Add another SDK
+## 5. Create a profile for YourSdk
 
-Archive mode accepts any Android AAR directly. For publisher APK measurements, copy `profiles/exif/` to a new directory and change two files.
+Archive mode accepts two AARs directly. For APK measurements, create `profiles/YourSdk/profile.json` and a Java entry point beside it.
 
-1. Set `group` and `artifact` in `profile.json` to the Maven module. Optionally add `repository` for an additional Maven URL. Google Maven and Maven Central are configured by default.
-2. Implement `dev.madroid.footprint.SdkEntry.open(Activity)` under the adjacent `java/` directory. Call a representative public API. The integrated release includes this source so the shrinker can see an actual SDK usage path.
+1. In `profile.json`, replace the sample Maven coordinates below with the `groupId` and `artifactId` from your SDK's POM. Add a `repository` URL if needed. Google Maven and Maven Central are configured by default.
 
-Use `--profile path/to/profile.json` locally or the Action's `profile` input in CI. The repository includes profiles for [AndroidX ExifInterface](profiles/exif/) and [Playtime](profiles/playtime/). Private dependency repositories require the build runner to have appropriate access. For local host-supplied binary dependencies, place the appropriate standalone AAR/JAR and any required dependencies in a sibling `libs/` directory next to `profile.json`. The integrated host includes those binaries in its measured cost. Private libraries belong in the consuming CI workspace. Additional manifest entries, resources, Gradle plugins or a different minimum Android API may require adapting the host fixtures to match your SDK.
+   ```json
+   {"group": "com.example", "artifact": "your-sdk"}
+   ```
+
+2. Create `java/dev/madroid/footprint/SdkEntry.java` under `profiles/YourSdk/`. Declare the package `dev.madroid.footprint` and a public class `SdkEntry` with a `public static void open(android.app.Activity activity)` method. Have this method call a representative YourSdk API available in both versions so R8 retains the code a publisher would use.
+
+Pass `--profile profiles/YourSdk/profile.json` locally. In a consuming repository, set the Action's `profile` input to the profile path relative to that checkout.
+
+Private dependency repositories require the build runner to have appropriate access. For local host-supplied binary dependencies, place the appropriate standalone AAR/JAR and any required dependencies in a sibling `libs/` directory next to `profile.json`. The integrated host includes those binaries in its measured cost. Private libraries belong in the consuming CI workspace. Additional manifest entries, resources, Gradle plugins or a different minimum Android API may require adapting the host fixtures to match your SDK.
 
 ## Tests
 

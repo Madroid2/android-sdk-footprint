@@ -23,7 +23,7 @@ inputs:
     description: 'Local Gradle/Maven publication repository for the candidate version'
     required: false
   profile:
-    description: 'Path to a profile in the caller checkout, defaults to the bundled ExifInterface profile'
+    description: 'Path to a profile in the caller checkout, defaults to the bundled demo profile'
     required: false
   max-growth-bytes:
     description: 'Maximum allowed signed increase in bytes, inclusive'
